@@ -1,22 +1,23 @@
-"""Database connection helpers for SQLite persistence."""
+"""SQLite database path resolution and connection factory."""
 
 import os
 from pathlib import Path
 import sqlite3
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_DB_PATH = REPO_ROOT / "seed.db"
+_DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent / "seed.db"
 
 
 def get_db_path() -> Path:
-    """Return the configured SQLite database path."""
-    override = os.environ.get("BANK_DB_PATH")
-    return Path(override) if override else DEFAULT_DB_PATH
+    """Return the configured SQLite database path from BANK_DB_PATH or default seed.db."""
+    env_path = os.environ.get("BANK_DB_PATH")
+    if env_path:
+        return Path(env_path)
+    return _DEFAULT_DB_PATH
 
 
-def get_connection(db_path: Path | None = None) -> sqlite3.Connection:
+def get_connection(db_path: Path | str | None = None) -> sqlite3.Connection:
     """Open a SQLite connection configured for explicit transactions and foreign keys."""
-    target = db_path if db_path is not None else get_db_path()
+    target = Path(db_path) if db_path is not None else get_db_path()
     conn = sqlite3.connect(target, isolation_level=None, timeout=10.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")

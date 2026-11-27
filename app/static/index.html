@@ -3,114 +3,188 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Antigravity Bank — P2P Ledger &amp; Fraud Guardrails</title>
+    <title>Antigravity Bank — Atomic Ledger &amp; Fraud Guardrails</title>
     <link rel="stylesheet" href="/static/styles.css" />
+    <script src="/static/app.js" defer></script>
   </head>
   <body>
-    <div class="page-shell">
+    <div class="app-shell">
       <header class="topbar">
         <div class="brand-group">
-          <div class="brand-mark" aria-hidden="true">AB</div>
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" class="brand-icon" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L3 6.5v5.5c0 5.25 3.84 9.74 9 11 5.16-1.26 9-5.75 9-11V6.5L12 2z" />
+              <path d="M9 12l2 2 4-4" />
+            </svg>
+          </div>
           <div>
-            <h1>Antigravity Bank</h1>
-            <p class="subtitle">Double-Entry Ledger &amp; Real-Time Fraud Guardrails</p>
+            <h1 class="brand-title">Antigravity Bank</h1>
+            <p class="brand-subtitle">Double-Entry Atomic Ledger &amp; Real-Time Fraud Guardrails</p>
           </div>
         </div>
-        <div class="topbar-actions">
-          <span class="status-pill status-live">Atomic SQLite</span>
-          <span class="status-pill status-guard">Limit: $2,000 / tx</span>
-          <span class="status-pill status-velocity">Velocity: &gt;3 / 60s</span>
-          <button id="reset-demo-btn" type="button" class="btn btn-secondary">
+
+        <div class="topbar-controls">
+          <div class="status-pills" aria-label="System capabilities and guardrails">
+            <span class="status-pill status-pill--live" id="health-pill">
+              <span class="status-dot" aria-hidden="true"></span>
+              <span>Atomic SQLite</span>
+            </span>
+            <span class="status-pill">FX USD/EUR/PHP</span>
+            <span class="status-pill">Limit $2,000 USD</span>
+            <span class="status-pill">Velocity &gt;3 / 60s</span>
+          </div>
+
+          <button type="button" id="reset-demo-btn" class="btn btn--reset">
             Reset Demo
           </button>
         </div>
       </header>
 
-      <div id="alert-banner" class="alert-banner hidden" role="alert" aria-live="assertive">
-        <div class="alert-content">
-          <strong id="alert-title"></strong>
-          <p id="alert-message"></p>
+      <section id="alert-banner" class="alert-banner hidden" role="alert" aria-live="assertive">
+        <div class="alert-banner__main">
+          <div class="alert-banner__header">
+            <span id="alert-badge" class="alert-badge">STATUS</span>
+            <span id="alert-http-pill" class="alert-http-pill hidden">HTTP 201</span>
+          </div>
+          <p id="alert-message" class="alert-banner__message"></p>
+          <div id="alert-meta" class="alert-banner__meta"></div>
         </div>
-        <button id="alert-dismiss-btn" type="button" class="alert-dismiss" aria-label="Dismiss alert">
+        <button
+          type="button"
+          id="alert-dismiss-btn"
+          class="alert-dismiss"
+          aria-label="Dismiss notification"
+          title="Dismiss"
+        >
           &times;
         </button>
-      </div>
+      </section>
 
-      <section aria-label="Account Balances" class="accounts-grid" id="accounts-grid">
-        <!-- Populated dynamically by /static/app.js -->
+      <section class="section-block" aria-labelledby="accounts-heading">
+        <div class="section-header">
+          <div>
+            <h2 id="accounts-heading" class="section-title">Live Multi-Currency Balances</h2>
+            <p class="section-subtitle">Stored in integer minor units (cents) — zero floating-point math</p>
+          </div>
+          <span id="sync-status" class="sync-pill">Connecting...</span>
+        </div>
+
+        <div id="accounts-grid" class="accounts-grid">
+          <div class="balance-card balance-card--skeleton">Loading accounts...</div>
+        </div>
       </section>
 
       <main class="workspace-grid">
-        <section class="panel transfer-panel" aria-labelledby="send-money-heading">
+        <section class="panel send-panel" aria-labelledby="send-heading">
           <div class="panel-header">
             <div>
-              <h2 id="send-money-heading">Send Money</h2>
-              <p class="panel-caption">
-                Integer-cents accounting with automatic <code>Idempotency-Key</code> protection
-              </p>
+              <h2 id="send-heading" class="panel-title">Send Money</h2>
+              <p class="panel-subtitle">Atomic debit/credit with automatic Idempotency-Key</p>
+            </div>
+            <span class="panel-tag">Fixed-Point String</span>
+          </div>
+
+          <div class="quick-fill" role="group" aria-label="Stage quick-fill scenarios">
+            <span class="quick-fill__label">Stage Quick-Fill</span>
+            <div class="quick-fill__buttons">
+              <button type="button" class="btn btn--preset" data-preset="normal">
+                $250 Normal Transfer
+              </button>
+              <button type="button" class="btn btn--preset btn--preset-danger" data-preset="fraud">
+                $3,500 Trigger Fraud Block
+              </button>
+              <button type="button" class="btn btn--preset btn--preset-fx" data-preset="fx">
+                $100 USD&rarr;EUR FX
+              </button>
             </div>
           </div>
 
           <form id="transfer-form" class="transfer-form" novalidate>
-            <div class="form-row">
-              <div class="field">
-                <label for="from-account">From Account</label>
-                <select id="from-account" name="from_account_id" required></select>
+            <div class="account-route-row">
+              <div class="field-group">
+                <label for="from-account" class="field-label">From Account</label>
+                <select id="from-account" name="from_account_id" class="field-control"></select>
               </div>
-              <div class="field">
-                <label for="to-account">To Account</label>
-                <select id="to-account" name="to_account_id" required></select>
+
+              <button
+                type="button"
+                id="swap-accounts-btn"
+                class="btn-swap"
+                title="Swap sender and recipient"
+                aria-label="Swap sender and recipient accounts"
+              >
+                &#8646;
+              </button>
+
+              <div class="field-group">
+                <label for="to-account" class="field-label">To Account</label>
+                <select id="to-account" name="to_account_id" class="field-control"></select>
               </div>
             </div>
 
-            <div class="field">
-              <label for="amount-usd">Amount (USD)</label>
-              <div class="currency-input-wrap">
-                <span class="currency-prefix" aria-hidden="true">$</span>
+            <div class="field-group">
+              <div class="field-label-row">
+                <label for="amount-input" class="field-label">Amount</label>
+                <span id="guardrail-hint" class="guardrail-hint">Max $2,000.00 USD equiv. per transfer</span>
+              </div>
+              <div class="amount-input-wrap">
+                <span id="amount-currency-badge" class="amount-currency-badge">USD</span>
                 <input
-                  id="amount-usd"
-                  name="amount_usd"
+                  id="amount-input"
+                  name="amount"
                   type="text"
                   inputmode="decimal"
                   autocomplete="off"
+                  spellcheck="false"
                   placeholder="250.00"
                   value="250.00"
-                  required
+                  class="field-control amount-input"
                 />
               </div>
             </div>
 
-            <div class="quick-actions" aria-label="Demo Quick Fill">
-              <span class="quick-label">Demo Presets:</span>
-              <button type="button" class="btn btn-chip" data-preset="250.00">
-                $250 Normal Transfer
-              </button>
-              <button type="button" class="btn btn-chip btn-chip-danger" data-preset="3500.00">
-                $3,500 Trigger Fraud Block
-              </button>
+            <div id="fx-preview" class="fx-preview hidden" aria-live="polite">
+              <div class="fx-preview__header">
+                <span class="fx-preview__badge">FX Preview</span>
+                <span id="fx-rate-display" class="fx-preview__rate"></span>
+              </div>
+              <div class="fx-preview__grid">
+                <div>
+                  <span class="fx-preview__label">Estimated Recipient Credit</span>
+                  <strong id="fx-converted-display" class="fx-preview__value"></strong>
+                </div>
+                <div>
+                  <span class="fx-preview__label">USD Guardrail Estimate</span>
+                  <strong id="fx-usd-equiv-display" class="fx-preview__value"></strong>
+                </div>
+              </div>
             </div>
 
-            <div class="idempotency-row">
-              <span class="idempotency-label">Next Idempotency-Key:</span>
-              <code id="idempotency-preview" class="idempotency-code">pending</code>
+            <div class="idem-bar">
+              <span class="idem-bar__label">Idempotency-Key (auto-unique per submit):</span>
+              <code id="last-idem-key" class="idem-bar__value">generated on submit</code>
             </div>
 
-            <button id="submit-transfer-btn" type="submit" class="btn btn-primary btn-full">
-              Send Transfer Now
+            <button type="submit" id="send-submit-btn" class="btn btn--primary btn--full">
+              Send Money
             </button>
           </form>
         </section>
 
-        <section class="panel history-panel" aria-labelledby="transfers-heading">
+        <section class="panel audit-panel" aria-labelledby="audit-heading">
           <div class="panel-header">
             <div>
-              <h2 id="transfers-heading">Live Transfers &amp; Fraud Audit Log</h2>
-              <p class="panel-caption">Completed atomic transfers and blocked guardrail attempts</p>
+              <h2 id="audit-heading" class="panel-title">Transfers &amp; Fraud Audit Log</h2>
+              <p class="panel-subtitle">Completed transfers, BLOCKED_FRAUD audits, FX rates &amp; velocity tags</p>
             </div>
-            <span id="transfer-count" class="count-badge">0</span>
+            <div class="panel-counters">
+              <span id="transfers-count" class="count-badge">0 total</span>
+              <span id="blocked-count" class="count-badge count-badge--danger hidden">0 blocked</span>
+            </div>
           </div>
-          <div id="transfers-list" class="feed-list">
-            <!-- Populated dynamically by /static/app.js -->
+
+          <div id="transfers-list" class="audit-list">
+            <div class="empty-state">No transfers recorded yet.</div>
           </div>
         </section>
       </main>
@@ -118,34 +192,34 @@
       <section class="panel ledger-panel" aria-labelledby="ledger-heading">
         <div class="panel-header">
           <div>
-            <h2 id="ledger-heading">Double-Entry Ledger</h2>
-            <p class="panel-caption">
-              Every completed transfer creates balanced <code>DEBIT</code> and <code>CREDIT</code> entries in integer cents
-            </p>
+            <h2 id="ledger-heading" class="panel-title">Double-Entry Ledger</h2>
+            <p class="panel-subtitle">Immutable DEBIT &amp; CREDIT entries with currency &amp; running minor-unit balances</p>
           </div>
-          <span id="ledger-count" class="count-badge">0</span>
+          <span id="ledger-count" class="count-badge">0 entries</span>
         </div>
+
         <div class="table-wrap">
           <table class="ledger-table">
             <thead>
               <tr>
-                <th>Entry #</th>
+                <th>Entry</th>
+                <th>Time</th>
                 <th>Transfer ID</th>
                 <th>Account</th>
                 <th>Type</th>
-                <th class="num">Amount</th>
-                <th class="num">Balance After</th>
-                <th>Timestamp (UTC)</th>
+                <th>Currency</th>
+                <th class="num-col">Amount</th>
+                <th class="num-col">Balance After</th>
               </tr>
             </thead>
             <tbody id="ledger-tbody">
-              <!-- Populated dynamically by /static/app.js -->
+              <tr>
+                <td colspan="8" class="empty-cell">No ledger entries recorded yet.</td>
+              </tr>
             </tbody>
           </table>
         </div>
       </section>
     </div>
-
-    <script src="/static/app.js" defer></script>
   </body>
 </html>

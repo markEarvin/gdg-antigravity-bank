@@ -1,79 +1,75 @@
-"""FastAPI entrypoint for GDG Antigravity Bank."""
+"""FastAPI application and REST API endpoints for GDG Antigravity Bank."""
 
 from pathlib import Path
+from typing import Any
 
-from fastapi import FastAPI, Header
+from fastapi import FastAPI, Header, status
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field, StrictInt
+from pydantic import BaseModel, StrictStr
 
-from app.db import get_db_path
-from app.fraud import FraudLimitExceededError
-from app.ledger import (
-    AccountNotFoundError,
-    DuplicateIdempotencyKeyError,
-    InsufficientFundsError,
-    InvalidTransferError,
-    execute_transfer,
-    list_accounts,
-    list_ledger_entries,
-    list_transfers,
-)
-from seed_db import init_db
+import seed_db
+from app import db, fraud, fx, ledger
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
-app = FastAPI(title="GDG Antigravity Bank", version="1.0.0")
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app = FastAPI(title="GDG Antigravity Bank")
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 class TransferRequest(BaseModel):
-    """Validated transfer request payload using strict integer cents."""
+    """Payload for an atomic peer-to-peer transfer request."""
 
     from_account_id: str
     to_account_id: str
-    amount_cents: StrictInt = Field(..., gt=0)
+    amount: StrictStr
 
 
-@app.get("/")
-def serve_dashboard() -> FileResponse:
+@app.get("/", include_in_schema=False)
+def read_index() -> FileResponse:
     """Serve the single-page banking dashboard."""
     return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/api/health")
-def health() -> dict[str, str]:
-    """Return service health status."""
+def health_check() -> dict[str, str]:
+    """Return service health check payload."""
     return {"status": "ok"}
 
 
 @app.get("/api/accounts")
-def api_list_accounts() -> dict:
-    """Return current accounts and balances."""
-    return {"accounts": list_accounts()}
+def get_accounts() -> dict[str, list[dict[str, Any]]]:
+    """List all accounts with formatted balances and fraud flags."""
+    return {"accounts": ledger.list_accounts()}
 
 
 @app.get("/api/transfers")
-def api_list_transfers() -> dict:
-    """Return recent transfers and blocked fraud audit events."""
-    return {"transfers": list_transfers()}
+def get_transfers() -> dict[str, list[dict[str, Any]]]:
+    """List all transfer attempts including fraud-blocked audit rows."""
+    return {"transfers": ledger.list_transfers()}
 
 
 @app.get("/api/ledger")
-def api_list_ledger() -> dict:
-    """Return double-entry debit and credit ledger rows."""
-    return {"entries": list_ledger_entries()}
+def get_ledger() -> dict[str, list[dict[str, Any]]]:
+    """List all double-entry ledger debit and credit entries."""
+    return {"entries": ledger.list_ledger_entries()}
 
 
-@app.post("/api/transfers", status_code=201)
-def api_create_transfer(
+@app.get("/api/fx-rates")
+def get_fx_rates() -> dict[str, Any]:
+    """Return the configured multi-currency FX rates table."""
+    return fx.get_fx_rates_table()
+
+
+@app.post("/api/transfers", status_code=status.HTTP_201_CREATED)
+def create_transfer(
     payload: TransferRequest,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
-):
-    """Execute an idempotent, fraud-checked P2P transfer."""
+) -> JSONResponse:
+    """Execute an atomic double-entry transfer with idempotency and fraud checks."""
     if idempotency_key is None or not idempotency_key.strip():
         return JSONResponse(
-            status_code=400,
+            status_code=status.HTTP_400_BAD_REQUEST,
             content={
                 "error": "MISSING_IDEMPOTENCY_KEY",
                 "message": "Idempotency-Key header is required.",
@@ -81,51 +77,55 @@ def api_create_transfer(
         )
 
     try:
-        result = execute_transfer(
+        result = ledger.execute_transfer(
             from_account_id=payload.from_account_id,
             to_account_id=payload.to_account_id,
-            amount_cents=payload.amount_cents,
-            idempotency_key=idempotency_key,
+            amount=payload.amount,
+            idempotency_key=idempotency_key.strip(),
         )
-        return JSONResponse(status_code=201, content=result)
-    except FraudLimitExceededError as err:
+    except fraud.FraudLimitExceededError as err:
         return JSONResponse(
-            status_code=403,
+            status_code=status.HTTP_403_FORBIDDEN,
             content={
                 "error": err.code,
                 "message": err.message,
+                "usd_equivalent": err.usd_equivalent_str,
+                "limit_usd": err.limit_usd_str,
                 "amount_cents": err.amount_cents,
-                "limit_cents": err.limit_cents,
+                "usd_equivalent_cents": err.usd_equivalent_cents,
+                "limit_usd_cents": err.limit_usd_cents,
             },
         )
-    except InsufficientFundsError as err:
+    except ledger.InsufficientFundsError as err:
         return JSONResponse(
-            status_code=400,
+            status_code=status.HTTP_400_BAD_REQUEST,
             content={"error": "INSUFFICIENT_FUNDS", "message": str(err)},
         )
-    except DuplicateIdempotencyKeyError as err:
+    except ledger.DuplicateIdempotencyKeyError as err:
         return JSONResponse(
-            status_code=409,
+            status_code=status.HTTP_409_CONFLICT,
             content={
                 "error": "DUPLICATE_IDEMPOTENCY_KEY",
                 "message": str(err),
                 "existing_transfer": err.existing_transfer,
             },
         )
-    except AccountNotFoundError as err:
+    except ledger.AccountNotFoundError as err:
         return JSONResponse(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             content={"error": "ACCOUNT_NOT_FOUND", "message": str(err)},
         )
-    except InvalidTransferError as err:
+    except ledger.InvalidTransferError as err:
         return JSONResponse(
-            status_code=400,
+            status_code=status.HTTP_400_BAD_REQUEST,
             content={"error": "INVALID_TRANSFER", "message": str(err)},
         )
 
+    return JSONResponse(status_code=status.HTTP_201_CREATED, content=result)
+
 
 @app.post("/api/demo/reset")
-def api_demo_reset() -> dict:
-    """Reset the SQLite database back to seeded Alice and Bob balances."""
-    init_db(get_db_path(), reset=True)
-    return {"status": "reset", "accounts": list_accounts()}
+def reset_demo() -> dict[str, Any]:
+    """Reset the SQLite database to the seeded demo accounts and state."""
+    seed_db.init_db(db.get_db_path(), reset=True)
+    return {"status": "reset", "accounts": ledger.list_accounts()}
