@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Antigravity Bank — P2P Ledger &amp; Fraud Guardrails</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <div class="brand-group">
+          <div class="brand-mark" aria-hidden="true">AB</div>
+          <div>
+            <h1>Antigravity Bank</h1>
+            <p class="subtitle">Double-Entry Ledger &amp; Real-Time Fraud Guardrails</p>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <span class="status-pill status-live">Atomic SQLite</span>
+          <span class="status-pill status-guard">Limit: $2,000 / tx</span>
+          <span class="status-pill status-velocity">Velocity: &gt;3 / 60s</span>
+          <button id="reset-demo-btn" type="button" class="btn btn-secondary">
+            Reset Demo
+          </button>
+        </div>
+      </header>
+
+      <div id="alert-banner" class="alert-banner hidden" role="alert" aria-live="assertive">
+        <div class="alert-content">
+          <strong id="alert-title"></strong>
+          <p id="alert-message"></p>
+        </div>
+        <button id="alert-dismiss-btn" type="button" class="alert-dismiss" aria-label="Dismiss alert">
+          &times;
+        </button>
+      </div>
+
+      <section aria-label="Account Balances" class="accounts-grid" id="accounts-grid">
+        <!-- Populated dynamically by /static/app.js -->
+      </section>
+
+      <main class="workspace-grid">
+        <section class="panel transfer-panel" aria-labelledby="send-money-heading">
+          <div class="panel-header">
+            <div>
+              <h2 id="send-money-heading">Send Money</h2>
+              <p class="panel-caption">
+                Integer-cents accounting with automatic <code>Idempotency-Key</code> protection
+              </p>
+            </div>
+          </div>
+
+          <form id="transfer-form" class="transfer-form" novalidate>
+            <div class="form-row">
+              <div class="field">
+                <label for="from-account">From Account</label>
+                <select id="from-account" name="from_account_id" required></select>
+              </div>
+              <div class="field">
+                <label for="to-account">To Account</label>
+                <select id="to-account" name="to_account_id" required></select>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="amount-usd">Amount (USD)</label>
+              <div class="currency-input-wrap">
+                <span class="currency-prefix" aria-hidden="true">$</span>
+                <input
+                  id="amount-usd"
+                  name="amount_usd"
+                  type="text"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  placeholder="250.00"
+                  value="250.00"
+                  required
+                />
+              </div>
+            </div>
+
+            <div class="quick-actions" aria-label="Demo Quick Fill">
+              <span class="quick-label">Demo Presets:</span>
+              <button type="button" class="btn btn-chip" data-preset="250.00">
+                $250 Normal Transfer
+              </button>
+              <button type="button" class="btn btn-chip btn-chip-danger" data-preset="3500.00">
+                $3,500 Trigger Fraud Block
+              </button>
+            </div>
+
+            <div class="idempotency-row">
+              <span class="idempotency-label">Next Idempotency-Key:</span>
+              <code id="idempotency-preview" class="idempotency-code">pending</code>
+            </div>
+
+            <button id="submit-transfer-btn" type="submit" class="btn btn-primary btn-full">
+              Send Transfer Now
+            </button>
+          </form>
+        </section>
+
+        <section class="panel history-panel" aria-labelledby="transfers-heading">
+          <div class="panel-header">
+            <div>
+              <h2 id="transfers-heading">Live Transfers &amp; Fraud Audit Log</h2>
+              <p class="panel-caption">Completed atomic transfers and blocked guardrail attempts</p>
+            </div>
+            <span id="transfer-count" class="count-badge">0</span>
+          </div>
+          <div id="transfers-list" class="feed-list">
+            <!-- Populated dynamically by /static/app.js -->
+          </div>
+        </section>
+      </main>
+
+      <section class="panel ledger-panel" aria-labelledby="ledger-heading">
+        <div class="panel-header">
+          <div>
+            <h2 id="ledger-heading">Double-Entry Ledger</h2>
+            <p class="panel-caption">
+              Every completed transfer creates balanced <code>DEBIT</code> and <code>CREDIT</code> entries in integer cents
+            </p>
+          </div>
+          <span id="ledger-count" class="count-badge">0</span>
+        </div>
+        <div class="table-wrap">
+          <table class="ledger-table">
+            <thead>
+              <tr>
+                <th>Entry #</th>
+                <th>Transfer ID</th>
+                <th>Account</th>
+                <th>Type</th>
+                <th class="num">Amount</th>
+                <th class="num">Balance After</th>
+                <th>Timestamp (UTC)</th>
+              </tr>
+            </thead>
+            <tbody id="ledger-tbody">
+              <!-- Populated dynamically by /static/app.js -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
